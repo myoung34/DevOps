@@ -1,0 +1,193 @@
+{
+    "AWSTemplateFormatVersion": "2010-09-09",
+    "Description": "EBS Snapshot Runner for instances via Lambda.",
+    "Parameters": {
+        "LambdaIamRoleArn": {
+            "Type": "String",
+            "Description": "The ARN of the IAM role to run the lambda function as."
+        },
+        "TagKey": {
+            "Type": "String",
+            "Default": "Name",
+            "Description": "The Tag key to limit by"
+        },
+        "TagValue": {
+            "Type": "String",
+            "Default": "MyInstance",
+            "Description": "The Tag value to limit by"
+        }
+    },
+    "Resources": {
+        "EbsSnapshotWeeklyLambdaFunction": {
+            "Type": "AWS::Lambda::Function",
+            "Properties": {
+                "Handler": "index.lambda_handler",
+                "Role": { "Ref": "LambdaIamRoleArn" },
+                "Runtime": "python2.7",
+                "Code": {
+                    "ZipFile": {
+                        "Fn::Join": ["\n", [
+                          "import json",
+                          "import boto3",
+                          "def lambda_handler(event, context):",
+                          "    function_name=\"\"\"", { "Ref": "EbsSnapshotCreatorLambdaFunction" },"\"\"\"",
+                          "    client = boto3.client('lambda')",
+                          "    client.invoke(FunctionName=function_name.strip(), Payload=json.dumps({'retention_days': '42'}))"
+                        ]]
+                    }
+                },
+                "Runtime": "python2.7",
+                "Timeout": 60
+            }
+        },
+        "EbsSnapshotDailyLambdaFunction": {
+            "Type": "AWS::Lambda::Function",
+            "Properties": {
+                "Handler": "index.lambda_handler",
+                "Role": { "Ref": "LambdaIamRoleArn" },
+                "Runtime": "python2.7",
+                "Code": {
+                    "ZipFile": {
+                        "Fn::Join": ["\n", [
+                          "import json",
+                          "import boto3",
+                          "def lambda_handler(event, context):",
+                          "    function_name=\"\"\"", { "Ref": "EbsSnapshotCreatorLambdaFunction" },"\"\"\"",
+                          "    client = boto3.client('lambda')",
+                          "    client.invoke(FunctionName=function_name.strip(), Payload=json.dumps({'retention_days': '7'}))"
+                        ]]
+                    }
+                },
+                "Runtime": "python2.7",
+                "Timeout": 60
+            }
+        },
+        "EbsSnapshotJanitorLambdaFunction": {
+            "Type": "AWS::Lambda::Function",
+            "Properties": {
+                "Handler": "index.lambda_handler",
+                "Role": { "Ref": "LambdaIamRoleArn" },
+                "Runtime": "python2.7",
+                "Code": {
+                    "ZipFile": {
+                        "Fn::Join": ["\n", [
+                          "import boto3",
+                          "import re",
+                          "import datetime",
+                          "ec = boto3.client('ec2')",
+                          "iam = boto3.client('iam')",
+                          "def lambda_handler(event, context):",
+                          "    account_ids = list()",
+                          "    try:",
+                          "        iam.get_user()",
+                          "    except Exception as e:",
+                          "        # use the exception message to get the account ID the function executes under",
+                          "        account_ids.append(re.search(r'(arn:aws:sts::)([0-9]+)', str(e)).groups()[1])",
+                          "    delete_on = datetime.date.today().strftime('%Y-%m-%d')",
+                          "    filters = [",
+                          "        {'Name': 'tag-key', 'Values': ['DeleteOn']},",
+                          "        {'Name': 'tag-value', 'Values': [delete_on]},",
+                          "    ]",
+                          "    snapshot_response = ec.describe_snapshots(OwnerIds=account_ids, Filters=filters)",
+                          "    for snap in snapshot_response['Snapshots']:",
+                          "        print \"Deleting snapshot %s\" % snap['SnapshotId']",
+                          "        ec.delete_snapshot(SnapshotId=snap['SnapshotId'])"
+                        ]]
+                    }
+                },
+                "Runtime": "python2.7",
+                "Timeout": 60
+            }
+        },
+        "EbsSnapshotCreatorLambdaFunction": {
+            "Type": "AWS::Lambda::Function",
+            "Properties": {
+                "Handler": "index.lambda_handler",
+                "Role": { "Ref": "LambdaIamRoleArn" },
+                "Runtime": "python2.7",
+                "Code": {
+                    "ZipFile": {
+                        "Fn::Join": ["\n", [
+                          "import boto3",
+                          "import collections",
+                          "import datetime",
+                          "ec = boto3.client('ec2')",
+                          "def lambda_handler(event, context):",
+                          "    reservations = ec.describe_instances(",
+                          "        Filters=[",
+                          "            {'Name': 'tag-key', 'Values': [ { "Ref": "TagKey"  } ]},",
+                          "            {'Name': 'tag-value', 'Values': [ { "Ref": "TagValue"  } ]},",
+                          "        ]",
+                          "    ).get(",
+                          "        'Reservations', []",
+                          "    )",
+                          "    instances = sum(",
+                          "        [",
+                          "            [i for i in r['Instances']]",
+                          "            for r in reservations",
+                          "        ], [])",
+                          "    print \"Found %d instances that need backing up\" % len(instances)",
+                          "    to_tag = collections.defaultdict(list)",
+                          "    for instance in instances:",
+                          "        try:",
+                          "            retention_days = int(event['retention_days'])",
+                          "        except Exception:",
+                          "            retention_days = 7",
+                          "        for dev in instance['BlockDeviceMappings']:",
+                          "            if dev.get('Ebs', None) is None:",
+                          "                continue",
+                          "            vol_id = dev['Ebs']['VolumeId']",
+                          "            print \"Found EBS volume %s on instance %s\" % (",
+                          "                vol_id, instance['InstanceId'])",
+                          "            snap = ec.create_snapshot(",
+                          "                VolumeId=vol_id,",
+                          "            )",
+                          "            to_tag[retention_days].append(snap['SnapshotId'])",
+                          "            print \"Retaining snapshot %s of volume %s from instance %s for %d days\" % (",
+                          "                snap['SnapshotId'],",
+                          "                vol_id,",
+                          "                instance['InstanceId'],",
+                          "                retention_days,",
+                          "            )",
+                          "    for retention_days in to_tag.keys():",
+                          "        delete_date = datetime.date.today() + datetime.timedelta(days=retention_days)",
+                          "        delete_fmt = delete_date.strftime('%Y-%m-%d')",
+                          "        print \"Will delete %d snapshots on %s\" % (len(to_tag[retention_days]), delete_fmt)",
+                          "        ec.create_tags(",
+                          "            Resources=to_tag[retention_days],",
+                          "            Tags=[",
+                          "                {'Key': 'DeleteOn', 'Value': delete_fmt},",
+                          "                {'Key': { "Ref": "TagKey"  }, 'Value': { "Ref": "TagValue"  }},",
+                          "            ]",
+                          "        )"
+                        ]]
+                    }
+                },
+                "Runtime": "python2.7",
+                "Timeout": 60
+            }
+        }
+    },
+    "Outputs": {
+        "SnapshotTask": {
+            "Value": {
+                "Ref": "EbsSnapshotCreatorLambdaFunction"
+            }
+        },
+        "DailySnapshotTask": {
+            "Value": {
+                "Ref": "EbsSnapshotDailyLambdaFunction"
+            }
+        },
+        "WeeklySnapshotTask": {
+            "Value": {
+                "Ref": "EbsSnapshotWeeklyLambdaFunction"
+            }
+        },
+        "DeleteSnapshotTask": {
+            "Value": {
+                "Ref": "EbsSnapshotJanitorLambdaFunction"
+            }
+        }
+    }
+}
