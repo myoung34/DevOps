@@ -1,0 +1,17 @@
+policies:
+  - name: offhours-stop
+    resource: ec2
+    filters:
+      - type: offhour
+        default_tz: cst
+        offhour: 20
+    actions:
+      - stop
+  - name: onhour-morning-start
+    resource: ec2
+    filters:
+      - type: onhour
+        default_tz: cst
+        onhour: 6
+    actions:
+      - start
