@@ -51,7 +51,7 @@ resource "aws_ecs_task_definition" "cloud-custodian" {
 ]
 DEFINITION
   task_role_arn            = "${aws_iam_role.cloud-custodian.id}"
-  execution_role_arn       = "${aws_iam_role.cloud-custodian.id}"
+  execution_role_arn       = "${aws_iam_role.cloud-custodian-execution.id}"
   requires_compatibilities = [
     "FARGATE"
   ]
