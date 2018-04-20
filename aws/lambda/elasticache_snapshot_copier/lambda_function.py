@@ -19,7 +19,7 @@ def lambda_handler(event, context):
         try:
             latest_automated_snapshot = sorted(automated_snapshots, key=lambda x: (x['NodeSnapshots'][0]['SnapshotCreateTime']), reverse=True)[0]
         except IndexError:
-            break
+            continue
         identifier = 'manual-{}'.format(re.search('.+?\.(.*)', latest_automated_snapshot['SnapshotName']).group(1))
         print('creating {} from'.format(identifier, latest_automated_snapshot['SnapshotName']))
         try:
