@@ -1,0 +1,42 @@
+version: '2'
+
+services:
+  lambda:
+    container_name: lambda
+    image: lambci/lambda:python3.6
+    environment:
+      - AWS_REGION=$AWS_DEFAULT_REGION
+      - AWS_DEFAULT_REGION=$AWS_DEFAULT_REGION
+      - AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
+      - AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
+      - AWS_SESSION_TOKEN=$AWS_SESSION_TOKEN
+      - AWS_SECURITY_TOKEN=$AWS_SECURITY_TOKEN
+      - S3BUCKET=$S3BUCKET
+      - HOSTNAME=$HOSTNAME
+      - ENDPOINT_URL=http://localstack:4572
+    volumes:
+      - .:/var/task
+    networks:
+      - mynetwork
+    links:
+      - localstack
+  localstack:
+    image: localstack/localstack
+    ports:
+      - 4572:4572
+    environment:
+      - DEFAULT_REGION=us-east-1
+      - SERVICES=lambda,s3
+      - DEBUG=1
+      - LAMBDA_EXECUTOR=docker
+      - DOCKER_HOST=unix:///var/run/docker.sock
+      - HOSTNAME=localstack
+      - HOSTNAME_EXTERNAL=localstack
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /tmp/localstack:/tmp/localstack
+    networks:
+      - mynetwork
+
+networks:
+  mynetwork:
