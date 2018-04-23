@@ -1,0 +1,11 @@
+*venv*
+*Jenkinsfile*
+*.tf
+*.terraform*
+Makefile
+Dockerfile
+docker-compose.yml
+.gitignore
+README.md
+exclude.lst
+.python-version

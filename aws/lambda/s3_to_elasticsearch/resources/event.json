@@ -1,0 +1,38 @@
+{
+  "Records": [
+    {
+      "eventVersion": "2.0",
+      "eventSource": "aws:s3",
+      "awsRegion": "us-east-1",
+      "eventTime": "2018-03-29T17:14:10.240Z",
+      "eventName": "ObjectCreated:Post",
+      "userIdentity": {
+        "principalId": "AWS:AIDAJYAQ4T2F64BJAWHGA"
+      },
+      "requestParameters": {
+        "sourceIPAddress": "76.123.194.220"
+      },
+      "responseElements": {
+        "x-amz-request-id": "74EB075686F3C821",
+        "x-amz-id-2": "ce6FjO6PJVDFlQe4yc69+lPn+nOw65RFxWxJUoyQlM+m+C+RoDroDIucLc8rym8JVlp8Vj0AWfE="
+      },
+      "s3": {
+        "s3SchemaVersion": "1.0",
+        "configurationId": "tf-s3-topic-20180329164932817900000001",
+        "bucket": {
+          "name": "somebucket",
+          "ownerIdentity": {
+            "principalId": "AG1T3D3YZ1LT1"
+          },
+          "arn": "arn:aws:s3:::somebucket"
+        },
+        "object": {
+          "key": "foo.gz",
+          "size": 146241,
+          "eTag": "d85fef518f890cfd151178dbc77c54b9",
+          "sequencer": "005ABD1EE21300EC8A"
+        }
+      }
+    }
+  ]
+}
