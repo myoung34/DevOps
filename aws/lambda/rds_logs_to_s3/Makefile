@@ -4,6 +4,3 @@ zip:
 
 test:
 	bats test.bats
-
-clean:
-	git status . | grep Untracked -A 1000 | xargs rm -rf

@@ -15,28 +15,30 @@ def lambda_handler(event, context):
     for db_instance in [instance for instance in rds_client.describe_db_instances()['DBInstances']]:
         automated_snapshots = [s for s in rds_client.describe_db_snapshots(DBInstanceIdentifier=db_instance['DBInstanceIdentifier'])['DBSnapshots'] if (s['SnapshotType'] == 'automated' and s['Status'] == 'available')]
         manual_snapshots = [s for s in rds_client.describe_db_snapshots(DBInstanceIdentifier=db_instance['DBInstanceIdentifier'])['DBSnapshots'] if (s['SnapshotType'] != 'automated' and s['Status'] == 'available')]
-        latest_automated_snapshot = sorted(automated_snapshots, key=itemgetter('SnapshotCreateTime'), reverse=True)[0]
-        identifier = re.search('.+?:(.*)', latest_automated_snapshot['DBSnapshotIdentifier']).group(1)
-        print('creating {} from'.format(identifier, latest_automated_snapshot['DBSnapshotIdentifier']))
-        try:
-            rds_client.copy_db_snapshot(
-                SourceDBSnapshotIdentifier=latest_automated_snapshot['DBSnapshotIdentifier'],
-                TargetDBSnapshotIdentifier='manual-{}'.format(identifier),
-                Tags=[
-                    {
-                        'Key': 'Source',
-                        'Value': db_instance['DBInstanceIdentifier'],
-                    },
-                    {
-                        'Key': 'Managed_by',
-                        'Value': 'lambda:rds_snapshot_copier',
-                    },
-                ],
-                CopyTags=True,
-            )
-        except rds_client.exceptions.DBSnapshotAlreadyExistsFault:
-            print('Skipping already created snapshot')
-            pass
+        latest_automated_snapshots = sorted(automated_snapshots, key=itemgetter('SnapshotCreateTime'), reverse=True)
+        if (len(latest_automated_snapshots) > 0):
+            latest_automated_snapshot = latest_automated_snapshots[0]
+            identifier = re.search('.+?:(.*)', latest_automated_snapshot['DBSnapshotIdentifier']).group(1)
+            print('creating {} from'.format(identifier, latest_automated_snapshot['DBSnapshotIdentifier']))
+            try:
+                rds_client.copy_db_snapshot(
+                    SourceDBSnapshotIdentifier=latest_automated_snapshot['DBSnapshotIdentifier'],
+                    TargetDBSnapshotIdentifier='manual-{}'.format(identifier),
+                    Tags=[
+                        {
+                            'Key': 'Source',
+                            'Value': db_instance['DBInstanceIdentifier'],
+                        },
+                        {
+                            'Key': 'Managed_by',
+                            'Value': 'lambda:rds_snapshot_copier',
+                        },
+                    ],
+                    CopyTags=True,
+                )
+            except rds_client.exceptions.DBSnapshotAlreadyExistsFault:
+                print('Skipping already created snapshot')
+                pass
 
         print('Cleaning old snapshots')
         manual_snapshots = [s for s in rds_client.describe_db_snapshots(DBInstanceIdentifier=db_instance['DBInstanceIdentifier'])['DBSnapshots'] if (s['SnapshotType'] != 'automated' and s['Status'] == 'available')]
